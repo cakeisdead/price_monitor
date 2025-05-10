@@ -58,3 +58,4 @@ playwright/.cache/
 *screenshots
 *products.json
 *.log
+data.db
