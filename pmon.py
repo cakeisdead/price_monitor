@@ -43,7 +43,8 @@ async def start(item, url, size):
         async with async_pw() as pw:
             browser = await pw.chromium.launch(headless=CONFIG["HEADLESS_MODE"])
             page = await browser.new_page()
-            await page.goto(url, timeout=CONFIG["TIMEOUT"])
+            page.set_default_timeout(CONFIG["TIMEOUT"])
+            await page.goto(url)
             await page.wait_for_load_state('domcontentloaded')
 
             if size != '':
