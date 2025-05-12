@@ -2,20 +2,21 @@
 '''Amazon price monitor script using Playwright.'''
 import asyncio
 import json
-import sqlite3
 import os
 import logging
 from datetime import datetime
 from playwright.async_api import async_playwright as async_pw
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from product import Product
+from repository import PriceRepository
 
 # Configuration variables
 CONFIG = {
     "PRODUCTS_FILE_PATH": "products.json",
     "SCREENSHOTS_DIR": "screenshots",
     "HEADLESS_MODE": True,
-    "TIMEOUT": 10000
+    "TIMEOUT": 10000,
+    "DB_PATH": "data.db"
 }
 
 # Configure logging
@@ -92,27 +93,16 @@ def product_url_iterator(file_path):
 if __name__ == '__main__':
     logger = logging.getLogger(__name__)
     url_iterator = product_url_iterator(CONFIG["PRODUCTS_FILE_PATH"])
-    con = sqlite3.connect('data.db')
-    cursor = con.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS price_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item TEXT NOT NULL,
-            price TEXT NOT NULL,
-            url TEXT NOT NULL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    repo = PriceRepository(CONFIG["DB_PATH"])
 
     for ITEM_NAME, ITEM_URL, ITEM_SIZE in url_iterator:
         product = asyncio.run(start(ITEM_NAME, ITEM_URL, ITEM_SIZE))
         if product:
-            cursor.execute('''
-                INSERT INTO price_history (item, price, url)
-                VALUES (?, ?, ?)
-            ''', (product.name, product.price, product.url))
-            con.commit()
-            logging.info("Inserted %s into database.", product.name)
-    con.close()
+            insert = repo.save_price(product)
+            if insert:
+                logging.info("Inserted %s into database.", product.name)
+            else:
+                logging.error(
+                    "Failed to insert %s into database.", product.name)
 
     print("Script completed.")
