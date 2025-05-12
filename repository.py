@@ -40,3 +40,20 @@ class PriceRepository:
         except sqlite3.Error as e:
             print(f"Error saving price to database: {e}")
         return None
+
+    def get_last_price(self, item_name):
+        '''Retrieve the last recorded price for a given item.'''
+        try:
+            with sqlite3.connect(self.db_path) as con:
+                cursor = con.cursor()
+                cursor.execute('''
+                    SELECT price FROM price_history
+                    WHERE item = ?
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                ''', (item_name,))
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except sqlite3.Error as e:
+            print(f"Error retrieving last price: {e}")
+        return None

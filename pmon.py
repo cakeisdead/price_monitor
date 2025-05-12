@@ -59,7 +59,6 @@ async def start(item, url, size):
                     "(//div[@id='corePrice_feature_div']//span[@class='a-offscreen'])[1]")
                 await price_lbl.wait_for()
                 price = await price_lbl.inner_text()
-                logging.info("Current Price for %s is %s", item, price)
             except PlaywrightTimeoutError:
                 logging.error("Price not found for %s", item)
                 price = "N/A"
@@ -90,6 +89,13 @@ def product_url_iterator(file_path):
         raise
 
 
+def clean_value(value):
+    '''Clean the value by removing '$' and ','.'''
+    if isinstance(value, str):
+        return value.strip().replace('$', '').replace(',', '')
+    return value
+
+
 if __name__ == '__main__':
     logger = logging.getLogger(__name__)
     url_iterator = product_url_iterator(CONFIG["PRODUCTS_FILE_PATH"])
@@ -97,7 +103,15 @@ if __name__ == '__main__':
 
     for ITEM_NAME, ITEM_URL, ITEM_SIZE in url_iterator:
         product = asyncio.run(start(ITEM_NAME, ITEM_URL, ITEM_SIZE))
-        if product:
+        if product.price != "N/A":
+            previous_price = repo.get_last_price(product.name)
+            if previous_price:
+                logging.info("Current price of %s is %s. Previous price was %s. Difference: %s",
+                             product.name, product.price, previous_price,
+                             float(clean_value(product.price)) - float(clean_value(previous_price)))
+            else:
+                logging.info("Current price of %s is %s. No previous price found.",
+                             product.name, product.price)
             insert = repo.save_price(product)
             if insert:
                 logging.info("Inserted %s into database.", product.name)
