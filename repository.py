@@ -57,3 +57,39 @@ class PriceRepository:
         except sqlite3.Error as e:
             print(f"Error retrieving last price: {e}")
         return None
+
+    def get_report_data(self, data_points=12):
+        '''Retrieve data in json format for the report source.'''
+        try:
+            with sqlite3.connect(self.db_path) as con:
+                cursor = con.cursor()
+                cursor.execute(f'''
+                    SELECT item, price, timestamp, url
+                    FROM (
+                    SELECT
+                        item,
+                        price,
+                        timestamp,
+                        url,
+                        ROW_NUMBER() OVER (PARTITION BY item ORDER BY timestamp DESC) AS rn
+                    FROM price_history
+                )
+                WHERE rn <= {data_points};
+                ''')
+                data = cursor.fetchall()
+                items_dict = {}
+                for item, price, timestamp, url in data:
+                    print(f"Item: {item}, URL: {url}")
+                    if item not in items_dict:
+                        items_dict[item] = {
+                            'item': item,
+                            'url': url,
+                            'price_history': {}
+                        }
+                        items_dict[item]['price_history'][timestamp] = price
+
+            # Convert dictionary to list for JSON serialization
+            return list(items_dict.values())
+        except sqlite3.Error as e:
+            print(f"Error retrieving report data: {e}")
+        return []

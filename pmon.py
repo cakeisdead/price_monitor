@@ -96,13 +96,19 @@ def clean_value(value):
     return value
 
 
-if __name__ == '__main__':
-    logger = logging.getLogger(__name__)
-    url_iterator = product_url_iterator(CONFIG["PRODUCTS_FILE_PATH"])
-    repo = PriceRepository(CONFIG["DB_PATH"])
+def get_products(iterator):
+    '''Get products from the iterator and return a list of Product objects.'''
+    products = []
+    for item, url, size in iterator:
+        product = asyncio.run(start(item, url, size))
+        if product:
+            products.append(product)
+    return products
 
-    for ITEM_NAME, ITEM_URL, ITEM_SIZE in url_iterator:
-        product = asyncio.run(start(ITEM_NAME, ITEM_URL, ITEM_SIZE))
+
+def insert_products_to_db(repo, products):
+    '''Insert products into the database.'''
+    for product in products:
         if product.price != "N/A":
             previous_price = repo.get_last_price(product.name)
             if previous_price:
@@ -118,5 +124,62 @@ if __name__ == '__main__':
             else:
                 logging.error(
                     "Failed to insert %s into database.", product.name)
+
+
+def generate_html_report(data):
+    """Generate HTML report with latest prices"""
+    from jinja2 import Template
+
+    template_str = """
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Latest Product Prices</title>
+        <link rel="stylesheet" href="styles.css">
+      </head>
+      <body>
+        <h2>Latest Product Prices</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Product Name</th>
+              <th>Latest Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in products %}
+            <tr>
+              <td>{{ product.item }}</td>
+              <td>{{ product.price_history.values()|list|last }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p>Last updated: {{ timestamp }}</p>
+      </body>
+    </html>
+    """
+
+    template = Template(template_str)
+
+    html = template.render(
+        products=data,
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    )
+
+    with open("report/dashboard.html", "w") as f:
+        f.write(html)
+
+
+if __name__ == '__main__':
+    logger = logging.getLogger(__name__)
+    url_iterator = product_url_iterator(CONFIG["PRODUCTS_FILE_PATH"])
+    repo = PriceRepository(CONFIG["DB_PATH"])
+    # products = get_products(url_iterator)
+    # insert_products_to_db(repo, products)
+    data = repo.get_report_data(4)
+    print(json.dumps(data, indent=4))
+    generate_html_report(data)
+    logger.info("Report generated successfully.")
 
     print("Script completed.")
