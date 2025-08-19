@@ -75,12 +75,28 @@ async def start(item, url, size):
 
 
 def product_url_iterator(file_path):
-    '''Yield product URLs from a JSON file.'''
+    '''Yield product URLs from a JSON file. Skip items with skip_for > 0 and decrement their value.'''
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             products = json.load(file)
+            updated_products = []
+
             for prod in products:
+                skip_for = prod.get('skip_for', 0)
+
+                if skip_for > 0:
+                    # Decrement skip_for value
+                    prod['skip_for'] = skip_for - 1
+                    updated_products.append(prod)
+                    continue
+
+                updated_products.append(prod)
                 yield prod.get('item'), prod.get('url'), prod.get('size')
+
+            # Write back updated skip_for values
+            with open(file_path, 'w', encoding='utf-8') as write_file:
+                json.dump(updated_products, write_file, indent=4)
+
     except FileNotFoundError:
         logging.error("File not found: %s", file_path)
         raise
@@ -175,10 +191,10 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
     url_iterator = product_url_iterator(CONFIG["PRODUCTS_FILE_PATH"])
     repo = PriceRepository(CONFIG["DB_PATH"])
-    # products = get_products(url_iterator)
-    # insert_products_to_db(repo, products)
+    products = get_products(url_iterator)
+    insert_products_to_db(repo, products)
     data = repo.get_report_data(4)
-    print(json.dumps(data, indent=4))
+    # print(json.dumps(data, indent=4))
     generate_html_report(data)
     logger.info("Report generated successfully.")
 
