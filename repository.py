@@ -79,7 +79,7 @@ class PriceRepository:
                 data = cursor.fetchall()
                 items_dict = {}
                 for item, price, timestamp, url in data:
-                    print(f"Item: {item}, URL: {url}")
+                    # print(f"Item: {item}, URL: {url}")
                     if item not in items_dict:
                         items_dict[item] = {
                             'item': item,

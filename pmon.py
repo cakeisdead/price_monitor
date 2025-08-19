@@ -23,6 +23,7 @@ CONFIG = {
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%b %d %H:%M',
     handlers=[
         logging.FileHandler('pmon.log'),
         logging.StreamHandler()
@@ -128,15 +129,17 @@ def insert_products_to_db(repo, products):
         if product.price != "N/A":
             previous_price = repo.get_last_price(product.name)
             if previous_price:
-                logging.info("Current price of %s is %s. Previous price was %s. Difference: %s",
-                             product.name, product.price, previous_price,
-                             float(clean_value(product.price)) - float(clean_value(previous_price)))
+                price_diff = float(clean_value(product.price)) - \
+                    float(clean_value(previous_price))
+                diff_str = f"(-${abs(price_diff):.2f})" if price_diff < 0 else f"(+${price_diff:.2f})"
+                logging.info("%s: $%s %s", product.name,
+                             clean_value(product.price), diff_str)
             else:
-                logging.info("Current price of %s is %s. No previous price found.",
-                             product.name, product.price)
+                logging.info("%s: $%s (new)", product.name,
+                             clean_value(product.price))
             insert = repo.save_price(product)
             if insert:
-                logging.info("Inserted %s into database.", product.name)
+                logging.debug("Inserted %s into database.", product.name)
             else:
                 logging.error(
                     "Failed to insert %s into database.", product.name)
@@ -191,11 +194,9 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
     url_iterator = product_url_iterator(CONFIG["PRODUCTS_FILE_PATH"])
     repo = PriceRepository(CONFIG["DB_PATH"])
+    logger.info("Getting products data...")
     products = get_products(url_iterator)
     insert_products_to_db(repo, products)
     data = repo.get_report_data(4)
     # print(json.dumps(data, indent=4))
-    generate_html_report(data)
-    logger.info("Report generated successfully.")
-
-    print("Script completed.")
+    # generate_html_report(data)
